@@ -13,6 +13,7 @@
  * the hop that can't run here, let everything else run for real.
  */
 import { test, expect, DEFAULT_TEST_USER, MOCK_CSRF_TOKEN } from "../fixtures/api-mock";
+import { realSsoLogin } from "../fixtures/real-sso-login";
 import { API, APP } from "../utils/paths";
 import type { Page } from "@playwright/test";
 
@@ -54,12 +55,18 @@ async function mockSessionTransition(page: Page): Promise<void> {
 }
 
 test.describe("Mocked Keycloak SSO login flow", () => {
+  // Pure client-side contract tests -- no real backend involved, and a
+  // faked session has no real cookie behind it to survive a real proxied
+  // call. "Real Keycloak SSO login flow" below is the E2E_REAL_API coverage.
+  test.skip(IS_REAL_API, "mocked-only, see 'Real Keycloak SSO login flow'");
+
   test.beforeEach(async ({ apiMock }) => {
     await apiMock.mockSession({
       authenticated: false,
       ssoEnabled: true,
       providerName: "Keycloak",
     });
+    await apiMock.mockPermissions();
   });
 
   test('clicking "Sign in with Keycloak" navigates away, and a successful callback lands authenticated', async ({
@@ -130,5 +137,62 @@ test.describe("Mocked Keycloak SSO login flow", () => {
 
     await expect(page).toHaveURL(APP.LOGIN);
     await expect(page.getByLabel("Password")).toBeVisible();
+  });
+});
+
+async function loginThroughRealKeycloak(page: Page): Promise<void> {
+  await page.goto(APP.LOGIN);
+  await page.getByRole("button", { name: /Sign in with Keycloak/i }).click();
+  // Real Keycloak's own login form now, not this app's.
+  await realSsoLogin(page);
+  await page.waitForURL(new RegExp(`${APP.ROOT}$`));
+}
+
+test.describe("Real Keycloak SSO login flow (mcp-context-forge#6928, Task 6.2)", () => {
+  test.skip(!IS_REAL_API, "requires E2E_REAL_API=true against the real Keycloak stack");
+  // TODO: v1.0.11's get_current_user() never dispatches external-IdP bearer
+  // tokens -- every real-login API call 401s. Fixed on mcp-context-forge
+  // main, ships in v1.0.12. Remove this skip once docker-compose.e2e.yml's
+  // gateway image is bumped to v1.0.12+.
+  test.skip(IS_REAL_API, "blocked on mcp-context-forge v1.0.12 (external-IdP token dispatch fix)");
+
+  test("logs in through the real Keycloak form and makes a real proxied API call", async ({
+    page,
+  }) => {
+    await loginThroughRealKeycloak(page);
+    await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+
+    // Proves the gateway actually accepted the Keycloak-derived bearer token
+    // forwarded by the BFF's proxy, not just that a BFF-side cookie exists.
+    // Must go through /api/* (catch-all.ts) -- the bare path falls through
+    // to the SPA shell and always 200s regardless of auth state.
+    const response = await page.request.get("/api/rbac/my/permissions");
+    expect(response.ok()).toBeTruthy();
+  });
+
+  test("logout clears the BFF session and ends the Keycloak SSO session too", async ({ page }) => {
+    await loginThroughRealKeycloak(page);
+    await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+
+    // Not "Test User" -- that's the mocked fixture's name. The real
+    // Keycloak user's full_name comes from realm-export.json's firstName/lastName.
+    await page.getByRole("button", { name: "SSO Test" }).click();
+    await page.getByRole("button", { name: "Sign Out" }).click();
+
+    // Real logout can land on a bare /app/login (client-side redirect) or on
+    // /app/login?next=... (a dashboard background call 401ing first) -- both
+    // are the same "actually logged out" outcome, see smoke/app-loads.spec.ts.
+    await expect(page).toHaveURL(/\/app\/login(\?.*)?$/);
+    await expect(page.getByLabel("Password")).toBeVisible();
+
+    // BFF side: the session is actually gone, not just the cookie cleared
+    // client-side. Same /api/* note as the login test above.
+    const response = await page.request.get("/api/rbac/my/permissions");
+    expect(response.status()).toBe(401);
+
+    // Keycloak side: a live SSO session would silently re-approve this next
+    // request instead of showing the login form again -- only a real IdP can catch that.
+    await page.getByRole("button", { name: /Sign in with Keycloak/i }).click();
+    await expect(page.locator("#username")).toBeVisible();
   });
 });
