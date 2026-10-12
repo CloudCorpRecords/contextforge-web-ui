@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usersApi, deleteUser } from "./users";
 import { api } from "./client";
 import { ApiError } from "./client";
+import { USER_NOT_FOUND_DETAIL } from "@/utils/errors";
 
 // usersApi.list tests live in src/hooks/useUsersList.test.ts
 
@@ -54,7 +55,7 @@ describe("usersApi.delete", () => {
 
   it("should handle not found error", async () => {
     vi.mocked(api.delete).mockRejectedValue(
-      new ApiError(404, { detail: "User not found" }, "HTTP 404"),
+      new ApiError(404, { detail: USER_NOT_FOUND_DETAIL }, "HTTP 404"),
     );
 
     await expect(usersApi.delete("notfound@example.com")).rejects.toThrow(ApiError);
