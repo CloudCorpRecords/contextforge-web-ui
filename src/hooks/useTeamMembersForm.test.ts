@@ -52,6 +52,7 @@ import {
   updateTeamMember,
   removeTeamMember,
 } from "@/api/teams";
+import { USER_NOT_FOUND_DETAIL } from "@/utils/errors";
 import { api, ApiError } from "@/api/client";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -175,7 +176,7 @@ describe("useTeamMembersForm", () => {
   it("invites a new row whose email has no account instead of failing", async () => {
     vi.mocked(listTeamMembers).mockResolvedValue([]);
     vi.mocked(addTeamMember).mockRejectedValueOnce(
-      new ApiError(404, { detail: "User not found" }, "HTTP 404"),
+      new ApiError(404, { detail: USER_NOT_FOUND_DETAIL }, "HTTP 404"),
     );
     const { result, onSuccess } = renderForm();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -222,7 +223,7 @@ describe("useTeamMembersForm", () => {
   it("warns with a copyable link when an invitation is created but not delivered", async () => {
     vi.mocked(listTeamMembers).mockResolvedValue([]);
     vi.mocked(addTeamMember).mockRejectedValueOnce(
-      new ApiError(404, { detail: "User not found" }, "HTTP 404"),
+      new ApiError(404, { detail: USER_NOT_FOUND_DETAIL }, "HTTP 404"),
     );
     vi.mocked(inviteTeamMember).mockResolvedValueOnce({
       id: "inv-2",
@@ -255,6 +256,9 @@ describe("useTeamMembersForm", () => {
       expect.stringContaining("invitation"),
       expect.anything(),
     );
+    // Nothing was delivered, so no success toast (including the generic
+    // change-count one) should fire.
+    expect(toast.success).not.toHaveBeenCalled();
     expect(toast.warning).toHaveBeenCalledWith(
       expect.stringContaining("nobody@example.com"),
       expect.objectContaining({
@@ -272,7 +276,7 @@ describe("useTeamMembersForm", () => {
   it("invites a new row at the default member role (not just owner)", async () => {
     vi.mocked(listTeamMembers).mockResolvedValue([]);
     vi.mocked(addTeamMember).mockRejectedValueOnce(
-      new ApiError(404, { detail: "User not found" }, "HTTP 404"),
+      new ApiError(404, { detail: USER_NOT_FOUND_DETAIL }, "HTTP 404"),
     );
     const { result } = renderForm();
     await waitFor(() => expect(result.current.isLoading).toBe(false));

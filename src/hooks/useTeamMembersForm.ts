@@ -13,7 +13,7 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import type { TeamMember } from "@/types/team";
 import type { UsersResponse } from "@/types/user";
 import { copyToClipboard } from "@/lib/clipboard";
-import { extractApiErrorDetail, sanitizeError } from "@/utils/errors";
+import { extractApiErrorDetail, sanitizeError, USER_NOT_FOUND_DETAIL } from "@/utils/errors";
 
 export const AVAILABLE_ROLES = ["owner", "member"] as const;
 type TeamRole = (typeof AVAILABLE_ROLES)[number];
@@ -184,7 +184,7 @@ export function useTeamMembersForm({
           const isUnknownUser =
             err instanceof ApiError &&
             err.status === 404 &&
-            extractApiErrorDetail(err.body) === "User not found";
+            extractApiErrorDetail(err.body) === USER_NOT_FOUND_DETAIL;
           if (isUnknownUser) {
             const invitation = await inviteTeamMember(teamId, {
               email: member.email,
@@ -219,7 +219,6 @@ export function useTeamMembersForm({
       const totalChanges =
         addedEmails.length +
         sentInvitationEmails.length +
-        undeliveredInvitations.length +
         membersToUpdate.length +
         membersToRemove.length;
       if (totalChanges > 0) {

@@ -1,6 +1,7 @@
 import { test, expect } from "./fixtures/api-mock";
 import type { Page, Locator } from "@playwright/test";
 import { APP } from "./utils/paths";
+import { USER_NOT_FOUND_DETAIL } from "../src/utils/errors";
 import type { Team, TeamMember } from "../src/types/team";
 import type { TeamCreateRequest, TeamCreateResponse } from "../src/generated/types";
 
@@ -830,7 +831,7 @@ test.describe("Teams page", () => {
           await route.fulfill({
             status: 404,
             contentType: "application/json",
-            body: JSON.stringify({ detail: "User not found" }),
+            body: JSON.stringify({ detail: USER_NOT_FOUND_DETAIL }),
           });
         }
       });
@@ -907,7 +908,7 @@ test.describe("Teams page", () => {
           await route.fulfill({
             status: 404,
             contentType: "application/json",
-            body: JSON.stringify({ detail: "User not found" }),
+            body: JSON.stringify({ detail: USER_NOT_FOUND_DETAIL }),
           });
         }
       });

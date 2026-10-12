@@ -145,3 +145,6 @@ export function sanitizeError(err: unknown): string {
 
   return "An unexpected error occurred.";
 }
+
+/** Detail the API returns (404) when a referenced user does not exist. */
+export const USER_NOT_FOUND_DETAIL = "User not found";
