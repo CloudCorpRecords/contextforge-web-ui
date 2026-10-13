@@ -178,7 +178,11 @@ What it does:
 
 - **TTL decision**: the Redis session (and the `bff_sid` cookie's `maxAge`)
   get `config.sessionTtlSeconds` _only if_ `ssoTokens.refreshToken` is
-  present — otherwise they're capped at the access token's own `expires_in`.
+  present — otherwise they're capped at the access token's own `expires_in`,
+  when Keycloak sent a usable one. If `expires_in` is missing or invalid, the
+  fallback is the full `config.sessionTtlSeconds` instead; it's
+  `tokenExpiresAt` (stamped at `now + 0` in that case, see below) that then
+  ends the session on the very next request, not the cookie's own TTL.
   Rationale: a session with no refresh token can never be extended once the
   access token expires, so a long-lived cookie around a short-lived token
   would just mean every proxied call 401s for the remainder of the cookie's
