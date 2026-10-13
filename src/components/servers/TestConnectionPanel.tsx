@@ -463,32 +463,25 @@ export function TestConnectionPanel({ serverUrl }: TestConnectionPanelProps) {
           label="Headers"
           info="Request headers as a JSON object."
           error={errors.headers}
+          persistentHint={
+            mode === "handshake"
+              ? intl.formatMessage({ id: "mcpServer.testConnection.storedCredentialsHint" })
+              : undefined
+          }
         >
           {(controlProps) => (
-            <>
-              <Textarea
-                {...controlProps}
-                aria-describedby={
-                  [controlProps["aria-describedby"], mode === "handshake" ? "headers-hint" : null]
-                    .filter(Boolean)
-                    .join(" ") || undefined
-                }
-                value={headers}
-                onChange={(e) => {
-                  setHeaders(e.target.value);
-                  clearError("headers");
-                }}
-                onBlur={() => setErrors((prev) => ({ ...prev, headers: validateHeaders(headers) }))}
-                placeholder="Add request headers as JSON..."
-                className="bg-transparent font-mono text-sm focus-visible:ring-1 focus-visible:ring-offset-0"
-                disabled={isTesting}
-              />
-              {mode === "handshake" && (
-                <p id="headers-hint" className="text-[13px] text-muted-foreground">
-                  {intl.formatMessage({ id: "mcpServer.testConnection.storedCredentialsHint" })}
-                </p>
-              )}
-            </>
+            <Textarea
+              {...controlProps}
+              value={headers}
+              onChange={(e) => {
+                setHeaders(e.target.value);
+                clearError("headers");
+              }}
+              onBlur={() => setErrors((prev) => ({ ...prev, headers: validateHeaders(headers) }))}
+              placeholder="Add request headers as JSON..."
+              className="bg-transparent font-mono text-sm focus-visible:ring-1 focus-visible:ring-offset-0"
+              disabled={isTesting}
+            />
           )}
         </Field>
 

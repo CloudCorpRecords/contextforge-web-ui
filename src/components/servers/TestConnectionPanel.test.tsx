@@ -635,10 +635,10 @@ describe("TestConnectionPanel", () => {
       await selectHandshakeMode(user);
 
       const hint = screen.getByText(/stored credentials for registered servers/i);
-      expect(hint.id).toBe("headers-hint");
+      expect(hint.id).toBe("headers-persistent-hint");
       expect(screen.getByLabelText(/^headers/i)).toHaveAttribute(
         "aria-describedby",
-        "headers-hint",
+        "headers-persistent-hint",
       );
     });
 
@@ -653,7 +653,7 @@ describe("TestConnectionPanel", () => {
       await waitFor(() => expect(screen.getByText(/invalid headers json/i)).toBeInTheDocument());
       expect(screen.getByLabelText(/^headers/i)).toHaveAttribute(
         "aria-describedby",
-        "headers-error headers-hint",
+        "headers-error headers-persistent-hint",
       );
     });
 
