@@ -91,7 +91,7 @@ services:
       - ./e2e/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
       - keycloak-data:/opt/keycloak/data
     ports:
-      - "8180:8080"
+      - "127.0.0.1:8180:8080"
     healthcheck:
       test:
         [

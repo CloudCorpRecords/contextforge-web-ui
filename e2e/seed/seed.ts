@@ -126,9 +126,7 @@ interface SsoProviderDetail {
 // trusted_for_api_auth/api_audience have no env-var bootstrap on the gateway
 // (confirmed in mcp-context-forge) -- same admin-API call as that repo's own
 // `make compose-sso-seed-audience` Makefile target, ported to fetch. A no-op
-// (not an error) when no SSO provider exists at all -- the TLS-only e2e
-// variant (npm run e2e:docker:tls) shares this script but never sets
-// SSO_KEYCLOAK_*, so its gateway has none.
+// (not an error) when the provider list is empty.
 async function seedSsoTrustedApiAuth(adminToken: string): Promise<void> {
   const api = `${GATEWAY_URL}/auth/sso/admin/providers`;
   const authHeader = { [AUTH_HEADER_NAME]: `Bearer ${adminToken}` };
@@ -146,7 +144,11 @@ async function seedSsoTrustedApiAuth(adminToken: string): Promise<void> {
   let matched: string | undefined;
   for (const { id } of providers) {
     const detailRes = await fetch(`${api}/${id}`, { headers: authHeader });
-    if (!detailRes.ok) continue;
+    if (!detailRes.ok) {
+      throw new Error(
+        `Could not read SSO provider '${id}': ${detailRes.status} ${await detailRes.text()}`,
+      );
+    }
     const detail = (await detailRes.json()) as SsoProviderDetail;
     const realmMatches =
       detail.provider_metadata?.realm === SSO_SEED_REALM ||
@@ -172,6 +174,11 @@ async function seedSsoTrustedApiAuth(adminToken: string): Promise<void> {
   }
 
   const verifyRes = await fetch(`${api}/${matched}`, { headers: authHeader });
+  if (!verifyRes.ok) {
+    throw new Error(
+      `Could not re-read SSO provider '${matched}': ${verifyRes.status} ${await verifyRes.text()}`,
+    );
+  }
   const verify = (await verifyRes.json()) as SsoProviderDetail;
   if (verify.trusted_for_api_auth !== true || verify.api_audience !== SSO_SEED_API_AUDIENCE) {
     throw new Error(
