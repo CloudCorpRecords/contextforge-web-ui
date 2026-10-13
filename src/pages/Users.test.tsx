@@ -69,6 +69,7 @@ vi.mock("@/components/users/UserForm", () => ({
 
 import { api } from "@/api/client";
 import { ApiError } from "@/api/client";
+import { USER_NOT_FOUND_DETAIL } from "@/utils/errors";
 import * as AuthContextModule from "@/auth/AuthContext";
 
 const mockUseAuthContext = vi.mocked(AuthContextModule.useAuthContext);
@@ -653,7 +654,7 @@ describe("Users", () => {
       expect(screen.getByText("user0@example.com")).toBeInTheDocument();
     });
 
-    const notFoundError = new ApiError(404, { detail: "User not found" }, "HTTP 404");
+    const notFoundError = new ApiError(404, { detail: USER_NOT_FOUND_DETAIL }, "HTTP 404");
     mockApiDelete.mockRejectedValueOnce(notFoundError);
 
     const actionsButton = screen.getByRole("button", { name: "Actions for User 0" });
