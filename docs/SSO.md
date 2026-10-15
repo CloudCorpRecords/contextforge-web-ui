@@ -178,17 +178,18 @@ What it does:
 
 - **TTL decision**: the Redis session (and the `bff_sid` cookie's `maxAge`)
   get `config.sessionTtlSeconds` _only if_ `ssoTokens.refreshToken` is
-  present — otherwise they're capped at the access token's own `expires_in`,
-  when Keycloak sent a usable one. If `expires_in` is missing or invalid, the
-  fallback is the full `config.sessionTtlSeconds` instead; it's
-  `tokenExpiresAt` (stamped at `now + 0` in that case, see below) that then
-  ends the session on the very next request, not the cookie's own TTL.
+  present. Otherwise (an SSO response that omitted it, or a password login)
+  they get the upstream's usable `expires_in` when there is one, falling back
+  to the full `config.sessionTtlSeconds` when `expires_in` is missing or
+  invalid. For an SSO session that fallback case is then ended by
+  `tokenExpiresAt` (stamped at `now + 0`, see below) on the very next
+  request, not by the cookie's own TTL.
   Rationale: a session with no refresh token can never be extended once the
   access token expires, so a long-lived cookie around a short-lived token
   would just mean every proxied call 401s for the remainder of the cookie's
-  life. Password-login sessions (no `ssoTokens` at all) always get the full
-  TTL, since the upstream password-login JWT has its own independent
-  lifetime story.
+  life. Password-login sessions carry no `ssoTokens`, so no `tokenExpiresAt`
+  is stamped and `sessionAuth` never expiry-checks them; they rely on the
+  cookie/Redis TTL above.
 - **`tokenExpiresAt`** is stamped as `now + expires_in` (0 if Keycloak didn't
   send one) — the single source of truth `sessionAuth` later checks against,
   not re-derived from the JWT's own `exp` claim.
@@ -210,8 +211,9 @@ tokens and the ID token never leave the BFF.
 
 **File:** `server/src/plugins/session.ts`
 
-Every proxied `/api/*` call and every BFF-owned auth route runs through the
-`sessionAuth` preHandler first:
+Every proxied `/api/*` call (and the SSE and OAuth-popup proxy routes) runs
+through the `sessionAuth` preHandler first. `GET /auth/session` and
+`POST /auth/logout` do **not** — see the end of this section.
 
 1. No `bff_sid` cookie → `401 unauthenticated`.
 2. No matching Redis record → `401 session_expired`.
@@ -239,8 +241,21 @@ Every proxied `/api/*` call and every BFF-owned auth route runs through the
    looking authenticated immediately, not just once its TTL naturally lapses.
 
 On success, `request.session = { sessionId, bearerToken, user }` — everything
-downstream (the proxy, BFF-owned routes) reads from here, never from Redis
-directly.
+downstream (the proxy, SSE and OAuth routes) reads from here, never from
+Redis directly.
+
+### Routes that do not run `sessionAuth`
+
+The refresh and expiry guarantees above apply only to routes that install
+`sessionAuth`. Two BFF-owned routes deliberately don't:
+
+- **`GET /auth/session`** (`routes/auth/session.ts`) reads the Redis record
+  directly. It never checks `tokenExpiresAt` or attempts a refresh, so a
+  session whose SSO access token has expired can still return
+  `authenticated: true` until a protected request runs `sessionAuth` and
+  removes the record.
+- **`POST /auth/logout`** is guarded by `csrfProtection` only, so it works
+  even when the session is already expired or missing (Section 8).
 
 ---
 
